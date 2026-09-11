@@ -4,6 +4,7 @@
 
 ### redeploy verse A
 ### redeploy verse B
+### redeploy verse C
 
 personal reminder to recreate the .env file after pulling
 
