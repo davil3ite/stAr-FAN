@@ -7,8 +7,8 @@ import { createArticle, updateArticle, getArticleById, getEditions, createEditio
 import supabase from "../supabase.js";
 import "./css/write.css";
 
-const TYPES = ["Notícia", "Reportagem", "Artigo de opinião", "Crônica"];
-const THEMES = ["Esportes", "Cultura", "Escola", "Mundo", "Ciência", "Tecnologia", "Saúde", "Arte"];
+const TYPES = ["Notícia", "Reportagem", "Artigo de opinião", "Crônica", "Resenha Crítica"];
+const THEMES = ["Esportes", "Cultura", "SESI", "Brasil", "Mundo", "Ciência", "Tecnologia", "Saúde", "Arte", "Culinária"];
 const THEMES_VISIBLE = 6;
 const MAX_COAUTHORS = 4;
 
