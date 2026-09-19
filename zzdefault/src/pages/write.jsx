@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getSession } from "../auth.js";
 import { createArticle, updateArticle, getArticleById, getEditions, createEdition, deleteEdition } from "../articles.js";
+import { uploadImage } from "../storage.js";
 import supabase from "../supabase.js";
 import "./css/write.css";
 
@@ -13,15 +14,6 @@ const THEMES_VISIBLE = 6;
 const MAX_COAUTHORS = 4;
 
 const PARAGRAPH_INDENT = "3em";
-
-function fileToBase64(file) {
-  return new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = () => res(reader.result);
-    reader.onerror = rej;
-    reader.readAsDataURL(file);
-  });
-}
 
 function applyFormat(tag) {
   const sel = window.getSelection();
@@ -54,18 +46,12 @@ function applyFormat(tag) {
   sel.addRange(newRange);
 }
 
-/* ── Recuo de parágrafo (Tab) ──
-   Encontra o bloco onde o cursor está dentro do editor e aplica/remove
-   text-indent. Se o cursor estiver em texto solto (filho direto do editor),
-   envolve a linha num <div> antes de recuar, para não recuar o editor todo. */
 function findParagraphBlock(editor, node) {
-  // Sobe a partir do nó do cursor até o filho direto do editor
   let current = node;
   while (current && current.parentNode !== editor && current !== editor) {
     current = current.parentNode;
   }
   if (!current || current === editor) return null;
-  // Só aceita blocos de elemento (DIV/P), não imagens ou texto solto
   if (current.nodeType !== 1) return null;
   const tag = current.nodeName;
   if (tag !== "DIV" && tag !== "P") return null;
@@ -80,9 +66,7 @@ function toggleParagraphIndent(editor, remove) {
 
   let block = findParagraphBlock(editor, node);
 
-  // Texto solto direto no editor: envolve a linha atual num <div>
   if (!block) {
-    // formatBlock transforma a linha do cursor num bloco
     document.execCommand("formatBlock", false, "div");
     node = window.getSelection().anchorNode;
     block = findParagraphBlock(editor, node);
@@ -139,7 +123,6 @@ function IconAlignJustify() {
   );
 }
 
-/* ── Co-author avatar stack ── */
 function CoauthorStack({ author, coauthors, onAddClick, onRemove, maxReached, anonymous }) {
   const [visible, setVisible] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
@@ -209,7 +192,6 @@ function CoauthorStack({ author, coauthors, onAddClick, onRemove, maxReached, an
     scheduleHide();
   }
 
-  // Se anônimo, exibe avatar padrão e mensagem
   if (anonymous) {
     return (
       <div className="coauthor-row">
@@ -281,7 +263,6 @@ function CoauthorStack({ author, coauthors, onAddClick, onRemove, maxReached, an
   );
 }
 
-/* ── Modal de busca de co-autor ── */
 function CoauthorSearchModal({ onClose, onAdd, existingUsernames, currentUsername }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
@@ -402,24 +383,22 @@ function Write() {
   const [body, setBody] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [coverPreview, setCoverPreview] = useState("");
+  const [coverFile, setCoverFile] = useState(null);
   const [sources, setSources] = useState([{ label: "", url: "" }]);
   const [error, setError] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [activeFormats, setActiveFormats] = useState({ b: false, i: false, u: false });
   const [activeAlign, setActiveAlign] = useState("Left");
 
-  // Edições
   const [editions, setEditions] = useState([]);
   const [selectedEdition, setSelectedEdition] = useState(null);
   const [editionDropdownOpen, setEditionDropdownOpen] = useState(false);
   const [editionLoading, setEditionLoading] = useState(false);
   const [deleteWarning, setDeleteWarning] = useState(null);
 
-  // Co-autoria
   const [coauthors, setCoauthors] = useState([]);
   const [coauthorModalOpen, setCoauthorModalOpen] = useState(false);
 
-  // Autoria anônima — apenas adm+ pode usar
   const [anonymous, setAnonymous] = useState(false);
   const isAdmPlus = session?.type === "adm+";
 
@@ -446,7 +425,6 @@ function Write() {
           setCoverPreview(a.cover_image || "");
           setSources(a.sources?.length ? a.sources : [{ label: "", url: "" }]);
           setCoauthors(a.coauthors || []);
-          // Detecta se o artigo já era anônimo
           if (a.author === "anonymous") setAnonymous(true);
           if (bodyRef.current) bodyRef.current.innerHTML = a.body;
           if (a.edition_id) {
@@ -502,7 +480,6 @@ function Write() {
 
   function handleBodyChange() { setBody(bodyRef.current.innerHTML); }
 
-  // Tab = recuo de parágrafo; Shift+Tab = remove o recuo
   function handleKeyDown(e) {
     if (e.key === "Tab") {
       e.preventDefault();
@@ -558,17 +535,18 @@ function Write() {
     setBody(bodyRef.current.innerHTML);
   }
 
-  async function handleCoverChange(e) {
+  function handleCoverChange(e) {
     const file = e.target.files[0]; if (!file) return;
-    const base64 = await fileToBase64(file);
-    setCoverImage(base64); setCoverPreview(base64);
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
   }
 
   async function handleInlineImage(e) {
     const file = e.target.files[0]; if (!file) return;
-    const base64 = await fileToBase64(file);
+    const up = await uploadImage(file, "conteudo");
+    if (!up.ok) { setError("Erro ao enviar imagem do texto."); e.target.value = ""; return; }
     bodyRef.current.focus();
-    document.execCommand("insertImage", false, base64);
+    document.execCommand("insertImage", false, up.url);
     setBody(bodyRef.current.innerHTML);
     e.target.value = "";
   }
@@ -598,15 +576,17 @@ function Write() {
     }
     setPublishing(true);
 
-    // Se anônimo, salva author como string "anonymous" e ignora co-autores.
-    // Caso contrário, salva apenas a referência por id — nome/foto são
-    // buscados na hora de exibir, então mudanças de perfil refletem sozinhas.
+    let coverUrl = coverImage;
+    if (coverFile) {
+      const up = await uploadImage(coverFile, "capas");
+      if (!up.ok) { setError("Erro ao enviar a imagem de capa."); setPublishing(false); return; }
+      coverUrl = up.url;
+    }
+
     const authorData = anonymous
       ? "anonymous"
       : { id: session.id };
 
-    // Co-autores viram referências por id. Se algum não tiver id (formato
-    // antigo carregado numa edição), preserva o objeto original como fallback.
     const coauthorRefs = coauthors.length > 0
       ? coauthors.map(c => (c.id != null ? { id: c.id } : c))
       : null;
@@ -616,7 +596,7 @@ function Write() {
       theme,
       headline: headline.trim(),
       body,
-      coverImage,
+      coverImage: coverUrl,
       images: [],
       sources: sources.filter(s => s.url.trim()),
       author: authorData,
@@ -651,7 +631,6 @@ function Write() {
       <main className="write-content">
         <div className="write-card">
 
-          {/* Checkbox de autoria anônima — só aparece para adm+ */}
           {isAdmPlus && (
             <label className="anonymous-checkbox-label">
               <input
@@ -664,7 +643,6 @@ function Write() {
             </label>
           )}
 
-          {/* Título + dropdown de edição */}
           <div className="write-title-row">
             <h1 className="write-title">{id ? "Editar matéria" : "Nova matéria"}</h1>
 
@@ -722,7 +700,6 @@ function Write() {
             ) : null}
           </div>
 
-          {/* Co-autoria */}
           <CoauthorStack
             author={{ name: session?.name || "", username: session?.username || "", avatar: session?.avatar || "" }}
             coauthors={coauthors}
@@ -732,7 +709,6 @@ function Write() {
             anonymous={anonymous}
           />
 
-          {/* Tipo */}
           <div className="write-field">
             <label>Tipo</label>
             <div className="type-options">
@@ -742,7 +718,6 @@ function Write() {
             </div>
           </div>
 
-          {/* Tema */}
           <div className="write-field">
             <label>Tema <span className="optional">(opcional)</span></label>
             <div className="type-options" style={{ position: "relative" }}>
@@ -779,13 +754,11 @@ function Write() {
             </div>
           </div>
 
-          {/* Manchete */}
           <div className="write-field">
             <label>Manchete</label>
             <input type="text" placeholder="Título da matéria" value={headline} onChange={e => { setHeadline(e.target.value); setError(""); }} />
           </div>
 
-          {/* Imagem de capa */}
           <div className="write-field">
             <label>Imagem de capa</label>
             <input ref={coverInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleCoverChange} />
@@ -795,7 +768,6 @@ function Write() {
             {coverPreview && <img src={coverPreview} alt="capa" className="cover-preview" />}
           </div>
 
-          {/* Texto */}
           <div className="write-field">
             <label>Texto</label>
             <div className="editor-toolbar">
@@ -825,7 +797,6 @@ function Write() {
             />
           </div>
 
-          {/* Fontes */}
           <div className="write-field">
             <label>Fontes <span className="optional">(opcional)</span></label>
             {sources.map((src, i) => (
