@@ -6,6 +6,7 @@ import {
   getSession, logout,
   updateName, updateEmail, updatePassword, updateUsername, updateAvatar, deleteAccount
 } from "../auth.js";
+import { uploadImage } from "../storage.js";
 import "./css/profile.css";
 
 function Profile() {
@@ -35,15 +36,14 @@ function Profile() {
   async function handleAvatar(e) {
     const file = e.target.files[0];
     if (!file) return;
-    const base64 = await new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onload = () => res(reader.result);
-      reader.onerror = rej;
-      reader.readAsDataURL(file);
-    });
-    const result = await updateAvatar(session.username, base64);
-    if (result.ok) { setSession(prev => ({ ...prev, avatar: base64 })); flash("Foto atualizada!"); }
+    flash("Enviando foto...");
+    // Sobe a imagem para o Storage e salva só a URL
+    const up = await uploadImage(file, "avatares");
+    if (!up.ok) { flash("Erro ao enviar foto.", false); return; }
+    const result = await updateAvatar(session.username, up.url);
+    if (result.ok) { setSession(prev => ({ ...prev, avatar: up.url })); flash("Foto atualizada!"); }
     else flash("Erro ao salvar foto.", false);
+    e.target.value = "";
   }
 
   async function handleName() {

@@ -29,7 +29,6 @@ const ADM_PLUS_EMAILS = [
   "joaoalexandretp@gmail.com",
   "marcosfabiano536@gmail.com",
 ];
-
 export function sanitizeUsername(raw) {
   return raw.toLowerCase().replace(/[^a-z0-9\-._]/g, "");
 }
@@ -159,11 +158,12 @@ export async function updateUsername(currentUsername, newUsername, password) {
   return { ok: true, session: updated };
 }
 
-export async function updateAvatar(username, base64) {
-  const { error } = await supabase.from("users").update({ avatar: base64 }).eq("username", username);
+// Agora recebe a URL da imagem (já enviada ao Storage), não mais o base64.
+export async function updateAvatar(username, url) {
+  const { error } = await supabase.from("users").update({ avatar: url }).eq("username", username);
   if (error) return { ok: false };
   const session = getSession();
-  const updated = { ...session, avatar: base64 };
+  const updated = { ...session, avatar: url };
   localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
   return { ok: true, session: updated };
 }
