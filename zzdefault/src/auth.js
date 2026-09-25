@@ -1,5 +1,6 @@
 // auth.js
 
+import { createClient } from "@supabase/supabase-js";
 import supabase from "./supabase.js";
 
 // Nome NOVO da sessão local — muda de "fannon_session" pra "fannon_session_v2".
@@ -44,8 +45,6 @@ export function isValidUsername(username) {
   return /^[a-z0-9\-._]+$/.test(username);
 }
 
-// Guarda o perfil (name, username, type, avatar, id, email) no localStorage
-// pra interface usar. NÃO é a sessão de segurança — essa é a do Supabase Auth.
 function saveSession(profile) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
   return profile;
@@ -76,7 +75,6 @@ export async function isEmailTaken(email, excludeEmail = null) {
   return data && data.length > 0;
 }
 
-// Busca o perfil na tabela users pelo id do usuário logado no Auth
 async function loadProfile(userId) {
   const { data } = await supabase
     .from("users")
@@ -86,7 +84,6 @@ async function loadProfile(userId) {
   return data || null;
 }
 
-// Chama a Edge Function pra migrar a senha de uma conta antiga
 async function migrateLegacyPassword(email, password) {
   try {
     const res = await fetch(FUNCTIONS_URL, {
@@ -103,6 +100,19 @@ async function migrateLegacyPassword(email, password) {
   }
 }
 
+// Confere a senha SEM afetar a sessão ativa: usa um cliente temporário
+// e isolado (não persiste sessão). Devolve true se a senha estiver certa.
+async function verifyPassword(email, password) {
+  const temp = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+  );
+  const { data, error } = await temp.auth.signInWithPassword({ email, password });
+  await temp.auth.signOut();
+  return !error && !!data?.user;
+}
+
 export async function register({ name, username, email, password }) {
   const clean = sanitizeUsername(username);
   if (!isValidUsername(clean)) return { ok: false, error: "username_invalid" };
@@ -115,14 +125,12 @@ export async function register({ name, username, email, password }) {
   if (ADM_PLUS_EMAILS.includes(email.toLowerCase())) type = "adm+";
   else if (ADM_EMAILS.includes(email.toLowerCase())) type = "adm";
 
-  // Cria a conta no Auth (login/senha)
   const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
     email: email.toLowerCase(),
     password,
   });
   if (signUpErr || !signUpData?.user) return { ok: false, error: "server" };
 
-  // Cria a linha de perfil na tabela users, com o MESMO id do Auth
   const { error: insertErr } = await supabase.from("users").insert({
     id: signUpData.user.id,
     name, username: clean, email: email.toLowerCase(),
@@ -136,25 +144,20 @@ export async function register({ name, username, email, password }) {
 export async function login({ email, password }) {
   const mail = email.toLowerCase();
 
-  // 1) Tenta logar direto pelo Auth (contas novas ou já migradas)
   let { data, error } = await supabase.auth.signInWithPassword({ email: mail, password });
 
-  // 2) Falhou? Pode ser conta antiga sem senha no Auth. Tenta migrar.
   if (error) {
     const mig = await migrateLegacyPassword(mail, password);
     if (mig.ok) {
-      // Migrou: tenta logar de novo com a mesma senha
       const retry = await supabase.auth.signInWithPassword({ email: mail, password });
       data = retry.data; error = retry.error;
     } else {
-      // Não migrou: senha errada ou conta inexistente
       return { ok: false };
     }
   }
 
   if (error || !data?.user) return { ok: false };
 
-  // 3) Logado — carrega o perfil da tabela users
   const profile = await loadProfile(data.user.id);
   if (!profile) return { ok: false };
 
@@ -169,23 +172,25 @@ export async function updateName(username, newName) {
   return { ok: true, session: updated };
 }
 
-// Troca de email: atualiza no Auth e na tabela users.
+// Troca de email: valida a senha atual e troca o email numa só chamada
+// (current_password evita re-logar e não bagunça a sessão).
 export async function updateEmail(username, newEmail, password) {
-  // Confere a senha atual re-logando
   const session = getSession();
-  const { error: pwErr } = await supabase.auth.signInWithPassword({
-    email: session.email, password,
-  });
-  if (pwErr) return { ok: false, error: "wrong_password" };
 
   const taken = await isEmailTaken(newEmail, session?.email);
   if (taken) return { ok: false, error: "email_taken" };
 
-  // Atualiza no Auth
-  const { error: authErr } = await supabase.auth.updateUser({ email: newEmail.toLowerCase() });
-  if (authErr) return { ok: false };
+  const { error: authErr } = await supabase.auth.updateUser({
+    email: newEmail.toLowerCase(),
+    current_password: password,
+  });
+  if (authErr) {
+    if (String(authErr.message).toLowerCase().includes("password")) {
+      return { ok: false, error: "wrong_password" };
+    }
+    return { ok: false };
+  }
 
-  // Atualiza na tabela users
   const { error } = await supabase.from("users").update({ email: newEmail.toLowerCase() }).eq("username", username);
   if (error) return { ok: false };
 
@@ -194,17 +199,18 @@ export async function updateEmail(username, newEmail, password) {
   return { ok: true, session: updated };
 }
 
+// Troca de senha: valida a atual e define a nova numa só chamada.
 export async function updatePassword(username, currentPassword, newPassword) {
-  const session = getSession();
-  // Confere a senha atual re-logando
-  const { error: pwErr } = await supabase.auth.signInWithPassword({
-    email: session.email, password: currentPassword,
+  const { error } = await supabase.auth.updateUser({
+    current_password: currentPassword,
+    password: newPassword,
   });
-  if (pwErr) return { ok: false, error: "wrong_password" };
-
-  // Define a nova senha no Auth
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) return { ok: false };
+  if (error) {
+    if (String(error.message).toLowerCase().includes("password")) {
+      return { ok: false, error: "wrong_password" };
+    }
+    return { ok: false };
+  }
   return { ok: true };
 }
 
@@ -213,13 +219,10 @@ export async function updateUsername(currentUsername, newUsername, password) {
   if (!isValidUsername(clean)) return { ok: false, error: "username_invalid" };
 
   const session = getSession();
-  // Confere a senha re-logando
-  const { error: pwErr } = await supabase.auth.signInWithPassword({
-    email: session.email, password,
-  });
-  if (pwErr) return { ok: false, error: "wrong_password" };
+  // Confere a senha sem derrubar a sessão
+  const ok = await verifyPassword(session.email, password);
+  if (!ok) return { ok: false, error: "wrong_password" };
 
-  // Checa cooldown de 24h
   const { data } = await supabase.from("users").select("username_changed_at").eq("username", currentUsername).single();
   if (data?.username_changed_at) {
     const diff = Date.now() - new Date(data.username_changed_at).getTime();
@@ -247,17 +250,20 @@ export async function updateAvatar(username, url) {
   return { ok: true, session: updated };
 }
 
-// Deletar conta: confere a senha, chama a Edge Function (que apaga do Auth
-// e da tabela users), e limpa a sessão local.
+// Deletar conta: confere a senha (via token da sessão atual), chama a
+// Edge Function (que apaga do Auth e da tabela users), e limpa o local.
 export async function deleteAccount(username, password) {
   const session = getSession();
-  // Confere a senha re-logando (isso também garante um token válido)
-  const { data: signIn, error: pwErr } = await supabase.auth.signInWithPassword({
-    email: session.email, password,
-  });
-  if (pwErr || !signIn?.session) return { ok: false, error: "wrong_password" };
 
-  const token = signIn.session.access_token;
+  // Confere a senha sem derrubar a sessão
+  const ok = await verifyPassword(session.email, password);
+  if (!ok) return { ok: false, error: "wrong_password" };
+
+  // Pega o token da sessão ATIVA pra autorizar o delete na Edge Function
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess?.session?.access_token;
+  if (!token) return { ok: false };
+
   try {
     const res = await fetch(FUNCTIONS_URL, {
       method: "POST",
