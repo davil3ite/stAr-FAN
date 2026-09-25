@@ -1,7 +1,5 @@
 # stAr-FAN
 
-## -> moved to ZZVER.md
-
 ### redeploy verse A
 ### redeploy verse B
 ### redeploy verse C
