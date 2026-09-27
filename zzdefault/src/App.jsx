@@ -1,11 +1,5 @@
 // App.jsx
 
-/*
-  insert in empty space below later
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
- */
-
 import { Routes, Route } from 'react-router-dom'
 import Hub from './pages/hub.jsx'
 import Login from './pages/login.jsx'
@@ -18,7 +12,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Hub />} />
-
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
       <Route path="/write" element={<Write />} />
       <Route path="/write/:id" element={<Write />} />
       <Route path="/article/:id" element={<Article />} />
