@@ -9,3 +9,4 @@
 - A (12:40): RLS issue fix attempt 3
 - B (12:42): Added "login.jsx" and "signup.jsx" back into routing
 - C (12:54): RLS issue fix attempt 4
+- D (13:09): RLS issue fix attempt 5

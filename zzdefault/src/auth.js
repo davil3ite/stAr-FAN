@@ -85,17 +85,26 @@ async function loadProfile(userId) {
   return data || null;
 }
 
+// Chama a Edge Function. A publishable key vai em "apikey"; se houver token
+// de usuário, vai em "Authorization: Bearer".
+async function callFunction(body, userToken = null) {
+  const headers = {
+    "Content-Type": "application/json",
+    "apikey": API_KEY,
+  };
+  if (userToken) headers["Authorization"] = `Bearer ${userToken}`;
+
+  const res = await fetch(FUNCTIONS_URL, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  return await res.json();
+}
+
 async function migrateLegacyPassword(email, password) {
   try {
-    const res = await fetch(FUNCTIONS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${API_KEY}`,
-      },
-      body: JSON.stringify({ action: "migrate", email, password }),
-    });
-    return await res.json();
+    return await callFunction({ action: "migrate", email, password });
   } catch {
     return { ok: false, reason: "network" };
   }
@@ -114,7 +123,6 @@ async function verifyPassword(email, password) {
   return !error && !!data?.user;
 }
 
-// Pega o token da sessão ativa (pra autorizar ações na Edge Function)
 async function currentToken() {
   const { data } = await supabase.auth.getSession();
   return data?.session?.access_token || null;
@@ -194,16 +202,7 @@ export async function updateEmail(username, newEmail, password) {
   if (!token) return { ok: false };
 
   try {
-    const res = await fetch(FUNCTIONS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${API_KEY}`,
-        "x-user-token": token,
-      },
-      body: JSON.stringify({ action: "change-email", newEmail: mail }),
-    });
-    const result = await res.json();
+    const result = await callFunction({ action: "change-email", newEmail: mail }, token);
     if (!result.ok) return { ok: false };
   } catch {
     return { ok: false };
@@ -276,16 +275,7 @@ export async function deleteAccount(username, password) {
   if (!token) return { ok: false };
 
   try {
-    const res = await fetch(FUNCTIONS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${API_KEY}`,
-        "x-user-token": token,
-      },
-      body: JSON.stringify({ action: "delete" }),
-    });
-    const result = await res.json();
+    const result = await callFunction({ action: "delete" }, token);
     if (!result.ok) return { ok: false };
   } catch {
     return { ok: false };
