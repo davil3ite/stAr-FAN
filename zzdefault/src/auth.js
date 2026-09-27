@@ -110,16 +110,22 @@ async function migrateLegacyPassword(email, password) {
   }
 }
 
-// Confere a senha SEM afetar a sessão ativa: usa um cliente temporário
-// e isolado (não persiste sessão). Devolve true se a senha estiver certa.
+// Confere a senha SEM afetar a sessão ativa. Usa um cliente temporário com
+// um storage próprio isolado (objeto em memória), pra NÃO tocar no
+// localStorage da sessão principal. Não faz signOut (nada a limpar).
 async function verifyPassword(email, password) {
+  const memStore = {
+    _d: {},
+    getItem(k) { return this._d[k] ?? null; },
+    setItem(k, v) { this._d[k] = v; },
+    removeItem(k) { delete this._d[k]; },
+  };
   const temp = createClient(
     import.meta.env.VITE_SUPABASE_URL,
     API_KEY,
-    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storage: memStore } }
   );
   const { data, error } = await temp.auth.signInWithPassword({ email, password });
-  await temp.auth.signOut();
   return !error && !!data?.user;
 }
 
@@ -195,11 +201,13 @@ export async function updateEmail(username, newEmail, password) {
   const taken = await isEmailTaken(mail, session?.email);
   if (taken) return { ok: false, error: "email_taken" };
 
-  const okPw = await verifyPassword(session.email, password);
-  if (!okPw) return { ok: false, error: "wrong_password" };
-
+  // Pega o token ANTES de validar a senha (o verify usa storage isolado,
+  // mas por segurança o token vem primeiro).
   const token = await currentToken();
   if (!token) return { ok: false };
+
+  const okPw = await verifyPassword(session.email, password);
+  if (!okPw) return { ok: false, error: "wrong_password" };
 
   try {
     const result = await callFunction({ action: "change-email", newEmail: mail }, token);
@@ -268,11 +276,12 @@ export async function updateAvatar(username, url) {
 export async function deleteAccount(username, password) {
   const session = getSession();
 
-  const ok = await verifyPassword(session.email, password);
-  if (!ok) return { ok: false, error: "wrong_password" };
-
+  // Pega o token ANTES de validar a senha
   const token = await currentToken();
   if (!token) return { ok: false };
+
+  const ok = await verifyPassword(session.email, password);
+  if (!ok) return { ok: false, error: "wrong_password" };
 
   try {
     const result = await callFunction({ action: "delete" }, token);
