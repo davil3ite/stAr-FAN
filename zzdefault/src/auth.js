@@ -8,7 +8,7 @@ import supabase from "./supabase.js";
 // logar de novo pelo sistema novo (é o que a gente queria).
 const SESSION_KEY = "fannon_session_v2";
 
-// URL da Edge Function que migra senha e deleta conta.
+// URL da Edge Function que migra senha, deleta conta e troca email.
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-assist`;
 
 const ADM_EMAILS = [
@@ -172,29 +172,39 @@ export async function updateName(username, newName) {
   return { ok: true, session: updated };
 }
 
-// Troca de email: valida a senha atual e troca o email numa só chamada
-// (current_password evita re-logar e não bagunça a sessão).
+// Troca de email via Edge Function (troca direto, sem email de confirmação).
 export async function updateEmail(username, newEmail, password) {
   const session = getSession();
+  const mail = newEmail.toLowerCase();
 
-  const taken = await isEmailTaken(newEmail, session?.email);
+  const taken = await isEmailTaken(mail, session?.email);
   if (taken) return { ok: false, error: "email_taken" };
 
-  const { error: authErr } = await supabase.auth.updateUser({
-    email: newEmail.toLowerCase(),
-    current_password: password,
-  });
-  if (authErr) {
-    if (String(authErr.message).toLowerCase().includes("password")) {
-      return { ok: false, error: "wrong_password" };
-    }
+  // Confere a senha sem derrubar a sessão
+  const okPw = await verifyPassword(session.email, password);
+  if (!okPw) return { ok: false, error: "wrong_password" };
+
+  // Pega o token da sessão ativa pra autorizar a troca
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess?.session?.access_token;
+  if (!token) return { ok: false };
+
+  try {
+    const res = await fetch(FUNCTIONS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action: "change-email", newEmail: mail }),
+    });
+    const result = await res.json();
+    if (!result.ok) return { ok: false };
+  } catch {
     return { ok: false };
   }
 
-  const { error } = await supabase.from("users").update({ email: newEmail.toLowerCase() }).eq("username", username);
-  if (error) return { ok: false };
-
-  const updated = { ...session, email: newEmail.toLowerCase() };
+  const updated = { ...session, email: mail };
   saveSession(updated);
   return { ok: true, session: updated };
 }
@@ -219,7 +229,6 @@ export async function updateUsername(currentUsername, newUsername, password) {
   if (!isValidUsername(clean)) return { ok: false, error: "username_invalid" };
 
   const session = getSession();
-  // Confere a senha sem derrubar a sessão
   const ok = await verifyPassword(session.email, password);
   if (!ok) return { ok: false, error: "wrong_password" };
 
@@ -250,16 +259,14 @@ export async function updateAvatar(username, url) {
   return { ok: true, session: updated };
 }
 
-// Deletar conta: confere a senha (via token da sessão atual), chama a
-// Edge Function (que apaga do Auth e da tabela users), e limpa o local.
+// Deletar conta: confere a senha, chama a Edge Function (apaga do Auth e da
+// tabela users), e limpa a sessão local.
 export async function deleteAccount(username, password) {
   const session = getSession();
 
-  // Confere a senha sem derrubar a sessão
   const ok = await verifyPassword(session.email, password);
   if (!ok) return { ok: false, error: "wrong_password" };
 
-  // Pega o token da sessão ATIVA pra autorizar o delete na Edge Function
   const { data: sess } = await supabase.auth.getSession();
   const token = sess?.session?.access_token;
   if (!token) return { ok: false };
