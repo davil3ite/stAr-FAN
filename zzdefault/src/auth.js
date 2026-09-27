@@ -10,6 +10,7 @@ const SESSION_KEY = "fannon_session_v2";
 
 // URL da Edge Function que migra senha, deleta conta e troca email.
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-assist`;
+const API_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
 const ADM_EMAILS = [
   "flame.outtakes981@passfwd.com",
@@ -90,7 +91,7 @@ async function migrateLegacyPassword(email, password) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_KEY}`,
+        "Authorization": `Bearer ${API_KEY}`,
       },
       body: JSON.stringify({ action: "migrate", email, password }),
     });
@@ -105,12 +106,18 @@ async function migrateLegacyPassword(email, password) {
 async function verifyPassword(email, password) {
   const temp = createClient(
     import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_KEY,
+    API_KEY,
     { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
   );
   const { data, error } = await temp.auth.signInWithPassword({ email, password });
   await temp.auth.signOut();
   return !error && !!data?.user;
+}
+
+// Pega o token da sessão ativa (pra autorizar ações na Edge Function)
+async function currentToken() {
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.access_token || null;
 }
 
 export async function register({ name, username, email, password }) {
@@ -180,13 +187,10 @@ export async function updateEmail(username, newEmail, password) {
   const taken = await isEmailTaken(mail, session?.email);
   if (taken) return { ok: false, error: "email_taken" };
 
-  // Confere a senha sem derrubar a sessão
   const okPw = await verifyPassword(session.email, password);
   if (!okPw) return { ok: false, error: "wrong_password" };
 
-  // Pega o token da sessão ativa pra autorizar a troca
-  const { data: sess } = await supabase.auth.getSession();
-  const token = sess?.session?.access_token;
+  const token = await currentToken();
   if (!token) return { ok: false };
 
   try {
@@ -194,7 +198,8 @@ export async function updateEmail(username, newEmail, password) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
+        "Authorization": `Bearer ${API_KEY}`,
+        "x-user-token": token,
       },
       body: JSON.stringify({ action: "change-email", newEmail: mail }),
     });
@@ -267,8 +272,7 @@ export async function deleteAccount(username, password) {
   const ok = await verifyPassword(session.email, password);
   if (!ok) return { ok: false, error: "wrong_password" };
 
-  const { data: sess } = await supabase.auth.getSession();
-  const token = sess?.session?.access_token;
+  const token = await currentToken();
   if (!token) return { ok: false };
 
   try {
@@ -276,7 +280,8 @@ export async function deleteAccount(username, password) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
+        "Authorization": `Bearer ${API_KEY}`,
+        "x-user-token": token,
       },
       body: JSON.stringify({ action: "delete" }),
     });
