@@ -16,9 +16,3 @@
 
 ## < 03/10/2026 >
 - A (14:27): Minor formatting changes; New mockup images; Removed unused files; Fixed IG URL bug; Moved Deploy Map to "README.md" and deleted "zzdeploymap.md"
--------------------------------------------------------------------------------------------------------------------------------------------------------
-personal reminder to recreate the .env file after pulling
-
-.env structure:
-VITE_SUPABASE_URL=[[urlkey]]
-VITE_SUPABASE_KEY=[[publishkey]]
