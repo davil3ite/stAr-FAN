@@ -98,11 +98,9 @@ button { display: flex; align-items: center; justify-content: center; text-align
 
 .articles-grid { max-width: 720px; width: 100%; padding: 40px 20px; display: flex; flex-direction: column; gap: 0; }
 
-/* ── Grupo por edição ── */
 .edition-group { display: flex; flex-direction: column; gap: 24px; margin-bottom: 24px; }
 .edition-group:last-child { margin-bottom: 0; }
 
-/* ── Separador de edição ── */
 .edition-separator {
   display: flex; align-items: center; gap: 16px;
   padding-top: 16px;
@@ -132,7 +130,6 @@ button { display: flex; align-items: center; justify-content: center; text-align
   border-radius: 1px;
 }
 
-/* ── Cards ── */
 .article-card {
   display: flex; flex-direction: row; border-radius: 12px; overflow: hidden;
   border: 1px solid #e0e0e0; cursor: pointer; transition: border-color 0.2s, transform 0.2s; background: #fff;
@@ -147,7 +144,6 @@ button { display: flex; align-items: center; justify-content: center; text-align
 .card-excerpt { font-size: 13px; color: #666; line-height: 1.6; }
 .card-meta { display: flex; gap: 10px; font-size: 11px; color: #aaa; margin-top: 4px; align-items: center; }
 
-/* ── Avatares sobrepostos no card ── */
 .card-avatars {
   display: flex; align-items: center; flex-shrink: 0;
 }
@@ -165,7 +161,6 @@ button { display: flex; align-items: center; justify-content: center; text-align
   font-family: 'DM Sans', sans-serif; flex-shrink: 0; position: relative;
 }
 
-/* Avatar anônimo no card */
 .card-avatar-anonymous {
   width: 20px; height: 20px; border-radius: 50%;
   background: #222; border: 1.5px solid #fff;

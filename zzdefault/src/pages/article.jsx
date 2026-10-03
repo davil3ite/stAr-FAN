@@ -6,12 +6,10 @@ import { getSession } from "../auth.js";
 import { getArticleById, getEditionById, deleteArticle } from "../articles.js";
 import "./css/article.css";
 
-const INSTAGRAM_URL = "https://www.instagram.com/folha.alfa_news/";
+const INSTAGRAM_URL = "https://www.instagram.com/folhaalfanews/";
 const CONTACT_EMAIL = "folhaalfanews@gmail.com";
 
-/* ── Helpers de co-autoria ── */
 function formatAuthorsText(author, coauthors) {
-  // Autoria anônima
   if (author === "anonymous") return "Autoria Anônima";
 
   const all = [author, ...(coauthors || [])];
@@ -23,7 +21,6 @@ function formatAuthorsText(author, coauthors) {
 }
 
 function AuthorAvatars({ author, coauthors }) {
-  // Autoria anônima: exibe avatar padrão preto
   if (author === "anonymous") {
     return (
       <div className="article-avatars">
@@ -78,7 +75,6 @@ function Article() {
   if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", background:"#f5f5f5" }}><p style={{ color: "#aaa", fontFamily: "Syne, sans-serif" }}>Carregando...</p></div>;
   if (!article) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", background:"#f5f5f5" }}><p style={{ color: "#aaa", fontFamily: "Syne, sans-serif" }}>Matéria não encontrada.</p></div>;
 
-  // Artigos anônimos: só adm+ pode editar/deletar
   const canEdit = session && (
     article.author === "anonymous"
       ? session.type === "adm+"

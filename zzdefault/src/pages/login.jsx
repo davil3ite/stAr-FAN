@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { login } from "../auth.js";
 import "./css/login.css";
 
-const INSTAGRAM_URL = "https://www.instagram.com/folha.alfa_news/";
+const INSTAGRAM_URL = "https://www.instagram.com/folhaalfanews/";
 const CONTACT_EMAIL = "folhaalfanews@gmail.com";
 
 function Login() {

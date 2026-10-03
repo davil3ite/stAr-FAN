@@ -6,7 +6,7 @@ import { getSession, logout } from "../auth.js";
 import { getArticles, deleteArticle, timeAgo, getEditions } from "../articles.js";
 import "./css/hub.css";
 
-const INSTAGRAM_URL = "https://www.instagram.com/folha.alfa_news/";
+const INSTAGRAM_URL = "https://www.instagram.com/folhaalfanews/";
 const CONTACT_EMAIL = "folhaalfanews@gmail.com";
 
 /* ── Helpers de co-autoria ── */

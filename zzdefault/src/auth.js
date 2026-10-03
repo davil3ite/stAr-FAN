@@ -3,12 +3,8 @@
 import { createClient } from "@supabase/supabase-js";
 import supabase from "./supabase.js";
 
-// Nome NOVO da sessão local — muda de "fannon_session" pra "fannon_session_v2".
-// Efeito: todas as sessões antigas viram inválidas, forçando todo mundo a
-// logar de novo pelo sistema novo (é o que a gente queria).
 const SESSION_KEY = "fannon_session_v2";
 
-// URL da Edge Function que migra senha, deleta conta e troca email.
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-assist`;
 const API_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
@@ -85,8 +81,6 @@ async function loadProfile(userId) {
   return data || null;
 }
 
-// Chama a Edge Function. A publishable key vai em "apikey"; se houver token
-// de usuário, vai em "Authorization: Bearer".
 async function callFunction(body, userToken = null) {
   const headers = {
     "Content-Type": "application/json",
@@ -110,9 +104,6 @@ async function migrateLegacyPassword(email, password) {
   }
 }
 
-// Confere a senha SEM afetar a sessão ativa. Usa um cliente temporário com
-// um storage próprio isolado (objeto em memória), pra NÃO tocar no
-// localStorage da sessão principal. Não faz signOut (nada a limpar).
 async function verifyPassword(email, password) {
   const memStore = {
     _d: {},
@@ -193,7 +184,6 @@ export async function updateName(username, newName) {
   return { ok: true, session: updated };
 }
 
-// Troca de email via Edge Function (troca direto, sem email de confirmação).
 export async function updateEmail(username, newEmail, password) {
   const session = getSession();
   const mail = newEmail.toLowerCase();
@@ -201,8 +191,6 @@ export async function updateEmail(username, newEmail, password) {
   const taken = await isEmailTaken(mail, session?.email);
   if (taken) return { ok: false, error: "email_taken" };
 
-  // Pega o token ANTES de validar a senha (o verify usa storage isolado,
-  // mas por segurança o token vem primeiro).
   const token = await currentToken();
   if (!token) return { ok: false };
 
@@ -221,7 +209,6 @@ export async function updateEmail(username, newEmail, password) {
   return { ok: true, session: updated };
 }
 
-// Troca de senha: valida a atual e define a nova numa só chamada.
 export async function updatePassword(username, currentPassword, newPassword) {
   const { error } = await supabase.auth.updateUser({
     current_password: currentPassword,
@@ -271,12 +258,9 @@ export async function updateAvatar(username, url) {
   return { ok: true, session: updated };
 }
 
-// Deletar conta: confere a senha, chama a Edge Function (apaga do Auth e da
-// tabela users), e limpa a sessão local.
 export async function deleteAccount(username, password) {
   const session = getSession();
 
-  // Pega o token ANTES de validar a senha
   const token = await currentToken();
   if (!token) return { ok: false };
 

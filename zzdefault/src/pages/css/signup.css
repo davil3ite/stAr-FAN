@@ -6,7 +6,6 @@
 html, body, #root { width: 100%; }
 body { font-family: 'DM Sans', sans-serif; min-height: 100vh; background: #f5f5f5; color: #111; }
 
-/* Wrapper que organiza a página em coluna e empurra o footer pro fim */
 .auth-page { min-height: 100vh; display: flex; flex-direction: column; }
 
 .header {
