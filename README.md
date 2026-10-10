@@ -15,4 +15,7 @@
 - E (13:23): RLS issue fix attempt 6 (successful)
 
 ## < 03/10/2026 >
-- A (14:27): Minor formatting changes; New mockup images; Removed unused files; Fixed IG URL bug; Moved Deploy Map to "README.md" and deleted "zzdeploymap.md"
+- A (14:27): Minor formatting changes; New wireframe images; Removed unused files; Fixed IG URL bug; Moved Deploy Map to "README.md" and deleted "zzdeploymap.md"
+
+## < 10/10/2026 >
+- A (14:53): "mockup" folder -> "wireframe" folder; New wireframe image
