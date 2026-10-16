@@ -22,4 +22,5 @@
 
 ## < 16/10/2026 >
 - A (15:05): Voting system attempt 1 (successful); Created "votes-format.js"
-- B (15:51): Library layout attempt 1; Highlighted article system attempt 1
+- B (15:51): Library layout attempt 1 (successful); Highlighted article system attempt 1
+- C (16:10): New Log-In and Sign-Up button attempt 1

@@ -20,7 +20,7 @@ button { display: flex; align-items: center; justify-content: center; text-align
   z-index: 300 !important;
 }
 .header-left { display: flex; align-items: center; width: 160px; }
-.header-right { display: flex; align-items: center; gap: 10px; width: 160px; justify-content: flex-end; }
+.header-right { display: flex; align-items: center; gap: 10px; min-width: 160px; justify-content: flex-end; }
 .header-center { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; }
 .btn-logo { background: none; border: none; }
 
@@ -51,6 +51,25 @@ button { display: flex; align-items: center; justify-content: center; text-align
   transition: background 0.2s; letter-spacing: 0.02em;
 }
 .btn-signup:hover { background: rgb(215, 41, 41) !important; border-color: #FDF4F6 !important; color: #FDF4F6 !important; }
+
+/* ── Botão único Log-In / Sign-Up ── */
+.btn-auth {
+  display: flex; align-items: center; gap: 9px;
+  background: #fff; border: none; color: #111;
+  padding: 7px 18px 7px 10px; border-radius: 999px; /* 100% redondo */
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+.btn-auth:hover { background: #f1f1f1; }
+.btn-auth-icon {
+  width: 26px; height: 26px; border-radius: 50%;
+  object-fit: cover; display: block; flex-shrink: 0;
+}
+/* versão na sidebar (fundo branco da sidebar): dá uma borda sutil */
+.sb-auth { border: 1px solid #e0e0e0; box-shadow: none; }
+.sb-auth:hover { background: #f5f5f5; }
 
 .sidebar-overlay {
   position: fixed; inset: 0; z-index: 90;

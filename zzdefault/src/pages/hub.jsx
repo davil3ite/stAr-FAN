@@ -284,10 +284,10 @@ function Layout() {
               <button className="btn-login" onClick={handleLogout}>Sair</button>
             </>
           ) : (
-            <>
-              <button className="btn-login" onClick={() => navigate('/login')}>Log in</button>
-              <button className="btn-signup" onClick={() => navigate('/signup')}>Sign up</button>
-            </>
+            <button className="btn-auth" onClick={() => navigate('/login')}>
+              <img src="/loginsigninicon.png" className="btn-auth-icon" alt="" />
+              <span>Log-In / Sign-Up</span>
+            </button>
           )}
         </div>
       </header>
@@ -317,10 +317,10 @@ function Layout() {
                 <button className="sb-login" onClick={handleLogout}>Sair</button>
               </>
             ) : (
-              <>
-                <button className="sb-login" onClick={() => navigate('/login')}>Log in</button>
-                <button className="sb-signup" onClick={() => navigate('/signup')}>Sign up</button>
-              </>
+              <button className="btn-auth sb-auth" onClick={() => navigate('/login')}>
+                <img src="/loginsigninicon.png" className="btn-auth-icon" alt="" />
+                <span>Log-In / Sign-Up</span>
+              </button>
             )}
           </div>
         </div>

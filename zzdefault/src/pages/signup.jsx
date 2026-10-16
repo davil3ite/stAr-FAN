@@ -58,10 +58,7 @@ function Signup() {
             <img src="/logofanNEOsite.png" style={{ height: "65px", width: "auto" }} />
           </button>
         </div>
-        <div className="header-right">
-          <button className="btn-login" onClick={() => navigate("/login")}>Login</button>
-          <button className="btn-signup active">Sign up</button>
-        </div>
+        <div className="header-right" />
       </header>
 
       <main className="auth-content">
