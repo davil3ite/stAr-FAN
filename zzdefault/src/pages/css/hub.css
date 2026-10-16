@@ -55,21 +55,19 @@ button { display: flex; align-items: center; justify-content: center; text-align
 /* ── Botão único Log-In / Sign-Up ── */
 .btn-auth {
   display: flex; align-items: center; gap: 9px;
-  background: #fff; border: none; color: #111;
+  background: #FF1E2D; border: 1px solid #FDF4F6; color: #FDF4F6;
   padding: 7px 18px 7px 10px; border-radius: 999px; /* 100% redondo */
   font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
   cursor: pointer; white-space: nowrap;
-  transition: background 0.2s, box-shadow 0.2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  transition: background 0.2s;
 }
-.btn-auth:hover { background: #f1f1f1; }
+.btn-auth:hover { background: rgb(215, 41, 41); border-color: #FDF4F6; color: #FDF4F6; }
 .btn-auth-icon {
   width: 26px; height: 26px; border-radius: 50%;
   object-fit: cover; display: block; flex-shrink: 0;
 }
-/* versão na sidebar (fundo branco da sidebar): dá uma borda sutil */
-.sb-auth { border: 1px solid #e0e0e0; box-shadow: none; }
-.sb-auth:hover { background: #f5f5f5; }
+/* versão na sidebar (fundo branco da sidebar): borda vermelha pra aparecer */
+.sb-auth { border-color: #FF1E2D; }
 
 .sidebar-overlay {
   position: fixed; inset: 0; z-index: 90;

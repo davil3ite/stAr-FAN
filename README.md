@@ -24,3 +24,4 @@
 - A (15:05): Voting system attempt 1 (successful); Created "votes-format.js"
 - B (15:51): Library layout attempt 1 (successful); Highlighted article system attempt 1
 - C (16:10): New Log-In and Sign-Up button attempt 1
+- D (16:15): New Log-In and Sign-Up button attempt 2; Removed used wireframe images
