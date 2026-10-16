@@ -21,4 +21,5 @@
 - A (14:53): "mockup" folder -> "wireframe" folder; New wireframe image
 
 ## < 16/10/2026 >
-- A (15:05): Voting system attempt 1; Created "votes-format.js"
+- A (15:05): Voting system attempt 1 (successful); Created "votes-format.js"
+- B (15:51): Library layout attempt 1; Highlighted article system attempt 1

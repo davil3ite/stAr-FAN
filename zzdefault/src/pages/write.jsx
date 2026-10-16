@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getSession } from "../auth.js";
-import { createArticle, updateArticle, getArticleById, getEditions, createEdition, deleteEdition } from "../articles.js";
+import { createArticle, updateArticle, getArticleById, getEditions, createEdition, deleteEdition, setFeaturedArticle } from "../articles.js";
 import { uploadImage } from "../storage.js";
 import supabase from "../supabase.js";
 import "./css/write.css";
@@ -400,6 +400,11 @@ function Write() {
   const [coauthorModalOpen, setCoauthorModalOpen] = useState(false);
 
   const [anonymous, setAnonymous] = useState(false);
+  // Matéria em destaque — só adm+ vê/usa.
+  // featured = estado atual do checkbox; wasFeatured = como estava ao abrir
+  // (pra saber, ao salvar, se precisamos tirar o destaque deste artigo).
+  const [featured, setFeatured] = useState(false);
+  const [wasFeatured, setWasFeatured] = useState(false);
   const isAdmPlus = session?.type === "adm+";
 
   const bodyRef = useRef(null);
@@ -426,6 +431,8 @@ function Write() {
           setSources(a.sources?.length ? a.sources : [{ label: "", url: "" }]);
           setCoauthors(a.coauthors || []);
           if (a.author === "anonymous") setAnonymous(true);
+          setFeatured(!!a.featured);
+          setWasFeatured(!!a.featured);
           if (bodyRef.current) bodyRef.current.innerHTML = a.body;
           if (a.edition_id) {
             getEditions().then(eds => {
@@ -603,8 +610,29 @@ function Write() {
       coauthors: anonymous ? null : coauthorRefs,
       editionId: selectedEdition?.id || null,
     };
-    if (id) await updateArticle(id, data);
-    else await createArticle(data);
+
+    // Salva o artigo e guarda o id (pra poder marcar/desmarcar o destaque).
+    let articleId = id;
+    if (id) {
+      await updateArticle(id, data);
+    } else {
+      const created = await createArticle(data);
+      articleId = created?.id || null;
+    }
+
+    // Destaque: só adm+ consegue mexer.
+    //  - checkbox ligado  -> marca este como destaque (desmarca o anterior)
+    //  - checkbox desligado E este ERA o destaque -> tira o destaque
+    //  - checkbox desligado e não era o destaque -> não mexe em nada
+    //    (importante: senão apagaria o destaque de outro artigo)
+    if (isAdmPlus && articleId) {
+      if (featured) {
+        await setFeaturedArticle(articleId);
+      } else if (wasFeatured) {
+        await setFeaturedArticle(null);
+      }
+    }
+
     setPublishing(false);
     navigate("/");
   }
@@ -632,15 +660,27 @@ function Write() {
         <div className="write-card">
 
           {isAdmPlus && (
-            <label className="anonymous-checkbox-label">
-              <input
-                type="checkbox"
-                className="anonymous-checkbox"
-                checked={anonymous}
-                onChange={handleAnonymousToggle}
-              />
-              <span>Autoria Anônima</span>
-            </label>
+            <div className="write-toggles">
+              <label className="anonymous-checkbox-label">
+                <input
+                  type="checkbox"
+                  className="anonymous-checkbox"
+                  checked={anonymous}
+                  onChange={handleAnonymousToggle}
+                />
+                <span>Autoria Anônima</span>
+              </label>
+
+              <label className="anonymous-checkbox-label">
+                <input
+                  type="checkbox"
+                  className="anonymous-checkbox"
+                  checked={featured}
+                  onChange={() => setFeatured(v => !v)}
+                />
+                <span>Matéria em destaque ★</span>
+              </label>
+            </div>
           )}
 
           <div className="write-title-row">

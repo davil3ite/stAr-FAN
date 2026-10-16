@@ -248,3 +248,32 @@ export async function getArticleCounts(articleId) {
   if (error || !data) return null;
   return { like: data.like || 0, dislike: data.dislike || 0 };
 }
+
+// ── Matéria em destaque ─────────────────────────────────────────────────────────
+
+// Pega o artigo marcado como destaque (featured = true), já com autor resolvido.
+// Devolve null se não houver nenhum destaque.
+export async function getFeaturedArticle() {
+  const { data, error } = await supabase
+    .from("articles")
+    .select("*")
+    .eq("featured", true)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  const [hydrated] = await hydrateAuthors([data]);
+  return hydrated;
+}
+
+// Define (ou troca) a matéria em destaque. Chama a função do banco, que
+// desmarca o destaque anterior e marca o novo numa transação só.
+//   articleId = uuid  -> marca esse artigo como destaque
+//   articleId = null  -> tira o destaque atual (fica sem destaque)
+// Só adm+ consegue (a função no banco barra os outros). Retorna { ok }.
+export async function setFeaturedArticle(articleId) {
+  const { error } = await supabase.rpc("set_featured_article", {
+    p_article_id: articleId,
+  });
+  if (error) return { ok: false, reason: error.message };
+  return { ok: true };
+}
