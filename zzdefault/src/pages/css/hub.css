@@ -167,6 +167,33 @@ button { display: flex; align-items: center; justify-content: center; text-align
   flex-shrink: 0; position: relative;
 }
 
+/* ── Botões de like / dislike ── */
+.vote-group { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+
+.vote-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: 1px solid #ccc; border-radius: 999px;
+  padding: 5px 12px; cursor: pointer;
+  color: #888; /* símbolo cinza no estado estático */
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.vote-btn svg { fill: currentColor; display: block; }
+.vote-btn .vote-count {
+  font-size: 11px; font-weight: 500;
+  color: #aaa; /* mesma cor do texto do autor no card */
+  line-height: 1;
+}
+.vote-btn:hover:not(:disabled) { border-color: #999; }
+.vote-btn:disabled { cursor: default; opacity: 0.85; }
+
+/* estado selecionado: vermelho do banner, símbolo branco */
+.vote-btn.active {
+  background: #FF1E2D; border-color: #FF1E2D; color: #fff;
+}
+.vote-btn.active .vote-count { color: #fff; }
+.vote-btn.active:hover:not(:disabled) { border-color: #FF1E2D; }
+
 .card-actions { display: flex; gap: 6px; margin-top: 6px; }
 .card-action-btn {
   background: none; border: 1px solid #ddd; border-radius: 6px;

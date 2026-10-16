@@ -179,3 +179,72 @@ export function timeAgo(isoString) {
   if (diff < 604800) return `há ${Math.floor(diff / 86400)} dia(s)`;
   return new Date(isoString).toLocaleDateString("pt-BR");
 }
+
+// ── Votos (like / dislike) ──────────────────────────────────────────────────────
+
+// Pega o id do usuário logado no Supabase Auth (null se deslogado).
+async function getAuthUserId() {
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.user?.id || null;
+}
+
+// Devolve um mapa { [article_id]: 'like' | 'dislike' } com os votos
+// do usuário logado. Se estiver deslogado, devolve {} (sem votos).
+// 1 query só — usada pra pintar os botões no hub e na página do artigo.
+export async function getMyVotes() {
+  const uid = await getAuthUserId();
+  if (!uid) return {};
+  const { data, error } = await supabase
+    .from("votes")
+    .select("article_id, value")
+    .eq("user_id", uid);
+  if (error || !data) return {};
+  const map = {};
+  for (const v of data) map[v.article_id] = v.value;
+  return map;
+}
+
+// Vota num artigo.
+//   value = 'like'     -> marca like (troca se já tinha dislike)
+//   value = 'dislike'  -> marca dislike (troca se já tinha like)
+//   value = null       -> tira o voto
+// A recontagem dos totais (colunas like/dislike na articles) é feita
+// automaticamente pela trigger no banco.
+// Retorna { ok, value } com o voto FINAL ('like' | 'dislike' | null).
+export async function castVote(articleId, value) {
+  const uid = await getAuthUserId();
+  if (!uid) return { ok: false, reason: "not_logged" };
+
+  // Tirar o voto
+  if (value === null) {
+    const { error } = await supabase
+      .from("votes")
+      .delete()
+      .eq("user_id", uid)
+      .eq("article_id", articleId);
+    if (error) return { ok: false, reason: "server" };
+    return { ok: true, value: null };
+  }
+
+  // Marcar/trocar: upsert pela chave (user_id, article_id)
+  const { error } = await supabase
+    .from("votes")
+    .upsert(
+      { user_id: uid, article_id: articleId, value },
+      { onConflict: "user_id,article_id" }
+    );
+  if (error) return { ok: false, reason: "server" };
+  return { ok: true, value };
+}
+
+// Lê os totais atualizados (like/dislike) de UM artigo direto do banco.
+// Útil pra sincronizar os números depois de votar.
+export async function getArticleCounts(articleId) {
+  const { data, error } = await supabase
+    .from("articles")
+    .select("like, dislike")
+    .eq("id", articleId)
+    .single();
+  if (error || !data) return null;
+  return { like: data.like || 0, dislike: data.dislike || 0 };
+}

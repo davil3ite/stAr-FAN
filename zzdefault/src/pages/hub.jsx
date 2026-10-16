@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom'
 import { getSession, logout } from "../auth.js";
-import { getArticles, deleteArticle, timeAgo, getEditions } from "../articles.js";
+import { getArticles, deleteArticle, timeAgo, getEditions, getMyVotes, castVote } from "../articles.js";
+import { formatCount } from "../votes-format.js";
 import "./css/hub.css";
 
 const INSTAGRAM_URL = "https://www.instagram.com/folhaalfanews/";
@@ -56,17 +57,60 @@ function AuthorAvatars({ author, coauthors }) {
   );
 }
 
+/* ── Botões de like/dislike ── */
+function VoteButtons({ likes, dislikes, myVote, onVote, logged }) {
+  // Clique: se já tava marcado nessa opção, tira (null); senão marca.
+  function handle(e, value) {
+    e.stopPropagation();
+    if (!logged) return;
+    onVote(myVote === value ? null : value);
+  }
+
+  return (
+    <div className="vote-group" onClick={e => e.stopPropagation()}>
+      <button
+        type="button"
+        className={`vote-btn like ${myVote === "like" ? "active" : ""}`}
+        onClick={e => handle(e, "like")}
+        disabled={!logged}
+        title={logged ? "Gostei" : "Faça login pra votar"}
+      >
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+          <path d="M2 10.5h3.2V21H2V10.5zm19.3.4c0-1-.8-1.9-1.9-1.9h-5.4l.8-3.9v-.2c0-.4-.2-.8-.4-1.1l-.9-.8-5.6 5.6c-.3.3-.5.8-.5 1.3V19c0 1 .9 1.9 1.9 1.9h7.8c.8 0 1.5-.5 1.8-1.2l2.6-6.1c.1-.2.1-.4.1-.6v-.1z"/>
+        </svg>
+        <span className="vote-count">{formatCount(likes)}</span>
+      </button>
+
+      <button
+        type="button"
+        className={`vote-btn dislike ${myVote === "dislike" ? "active" : ""}`}
+        onClick={e => handle(e, "dislike")}
+        disabled={!logged}
+        title={logged ? "Não gostei" : "Faça login pra votar"}
+      >
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+          <path d="M22 13.5h-3.2V3H22v10.5zM2.7 13.1c0 1 .8 1.9 1.9 1.9H10l-.8 3.9v.2c0 .4.2.8.4 1.1l.9.8 5.6-5.6c.3-.3.5-.8.5-1.3V5c0-1-.9-1.9-1.9-1.9H6.9c-.8 0-1.5.5-1.8 1.2L2.5 10.4c-.1.2-.1.4-.1.6v.1z"/>
+        </svg>
+        <span className="vote-count">{formatCount(dislikes)}</span>
+      </button>
+    </div>
+  );
+}
+
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const [session, setSession] = useState(getSession());
   const [articles, setArticles] = useState([]);
   const [editions, setEditions] = useState([]);
+  // votos do usuário logado: { [article_id]: 'like' | 'dislike' }
+  const [myVotes, setMyVotes] = useState({});
 
   useEffect(() => {
-    Promise.all([getArticles(), getEditions()]).then(([arts, eds]) => {
+    Promise.all([getArticles(), getEditions(), getMyVotes()]).then(([arts, eds, votes]) => {
       setArticles(arts);
       setEditions(eds);
+      setMyVotes(votes);
     });
   }, []);
 
@@ -77,6 +121,55 @@ function Layout() {
     if (window.confirm("Tem certeza que quer deletar esta matéria?")) {
       await deleteArticle(id);
       setArticles(prev => prev.filter(a => a.id !== id));
+    }
+  }
+
+  // Clique num botão de voto num card.
+  async function handleVote(articleId, value) {
+    const prevVote = myVotes[articleId] || null;
+    if (prevVote === value) return; // nada muda
+
+    // 1. Atualiza a tela na hora (otimista): voto + contagens
+    setMyVotes(prev => {
+      const next = { ...prev };
+      if (value === null) delete next[articleId];
+      else next[articleId] = value;
+      return next;
+    });
+    setArticles(prev => prev.map(a => {
+      if (a.id !== articleId) return a;
+      let like = a.like || 0;
+      let dislike = a.dislike || 0;
+      // tira o voto antigo
+      if (prevVote === "like") like--;
+      if (prevVote === "dislike") dislike--;
+      // põe o novo
+      if (value === "like") like++;
+      if (value === "dislike") dislike++;
+      return { ...a, like: Math.max(0, like), dislike: Math.max(0, dislike) };
+    }));
+
+    // 2. Grava no banco. Se falhar, desfaz.
+    const res = await castVote(articleId, value);
+    if (!res.ok) {
+      setMyVotes(prev => {
+        const next = { ...prev };
+        if (prevVote === null) delete next[articleId];
+        else next[articleId] = prevVote;
+        return next;
+      });
+      setArticles(prev => prev.map(a => {
+        if (a.id !== articleId) return a;
+        let like = a.like || 0;
+        let dislike = a.dislike || 0;
+        // desfaz o novo
+        if (value === "like") like--;
+        if (value === "dislike") dislike--;
+        // repõe o antigo
+        if (prevVote === "like") like++;
+        if (prevVote === "dislike") dislike++;
+        return { ...a, like: Math.max(0, like), dislike: Math.max(0, dislike) };
+      }));
     }
   }
 
@@ -204,6 +297,13 @@ function Layout() {
                         <span>{formatAuthorsText(a.author, a.coauthors)}</span>
                         <span>{timeAgo(a.created_at)}</span>
                       </div>
+                      <VoteButtons
+                        likes={a.like || 0}
+                        dislikes={a.dislike || 0}
+                        myVote={myVotes[a.id] || null}
+                        onVote={(value) => handleVote(a.id, value)}
+                        logged={!!session}
+                      />
                       {canEdit(a) && (
                         <div className="card-actions" onClick={e => e.stopPropagation()}>
                           <button className="card-action-btn" onClick={e => { e.stopPropagation(); navigate(`/write/${a.id}`); }} title="Editar">✏️</button>
